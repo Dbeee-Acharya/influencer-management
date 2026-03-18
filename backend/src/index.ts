@@ -3,9 +3,11 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { ENV_VARS } from "./const/env.js";
 import { adminAuth } from "./middlewares/admin-auth.js";
+import type { AuthVariables } from "./middlewares/admin-auth.js";
 import { staffAuth } from "./routes/staff-auth.js";
+import { influencerManagement } from "./routes/influencer-management.js";
 
-const app = new Hono();
+const app = new Hono<{ Variables: AuthVariables }>();
 
 // Public routes
 app.route("/auth", staffAuth);
@@ -16,9 +18,9 @@ app.use("*", async (c, next) => {
   return adminAuth(c, next);
 });
 
-app.get("/", (c) => {
-  return c.text("Online!");
-});
+app.get("/", (c) => c.text("Online!"));
+
+app.route("/influencers", influencerManagement);
 
 serve(
   {
