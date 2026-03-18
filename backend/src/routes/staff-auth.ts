@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { staff } from "../db/schema.js";
 import { ENV_VARS } from "../const/env.js";
+import { adminAuth, canCreate } from "../middlewares/admin-auth.js";
 
 const staffAuth = new Hono();
 
@@ -39,6 +40,41 @@ staffAuth.post("/login", async (c) => {
   );
 
   return c.json({ token });
+});
+
+staffAuth.post("/staff", adminAuth, async (c) => {
+  if (!canCreate(c)) {
+    return c.json({ error: "Forbidden" }, 403);
+  }
+
+  const body = await c.req.json<{
+    name: string;
+    email: string;
+    password: string;
+    role?: "admin" | "editor" | "viewer";
+  }>();
+  const { name, email, password, role } = body;
+
+  if (!name || !email || !password) {
+    return c.json({ error: "name, email and password are required" }, 400);
+  }
+
+  const [existing] = await db
+    .select({ id: staff.id })
+    .from(staff)
+    .where(eq(staff.email, email))
+    .limit(1);
+
+  if (existing) {
+    return c.json({ error: "Email already in use" }, 409);
+  }
+
+  const [created] = await db
+    .insert(staff)
+    .values({ name, email, passwordHash: hashPassword(password), role })
+    .returning({ id: staff.id, name: staff.name, email: staff.email, role: staff.role });
+
+  return c.json(created, 201);
 });
 
 // Exported for use when creating staff members
