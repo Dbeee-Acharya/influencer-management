@@ -72,7 +72,7 @@ export type InfluencerFilters = {
   pageSize?: number;
 
   // Sorting
-  sortBy?: "name" | "brandCost" | "netCost" | "grossCost" | "createdAt";
+  sortBy?: "name" | "brandCost" | "netCost" | "grossCost" | "createdAt" | "followers";
   sortOrder?: "asc" | "desc";
 };
 
@@ -92,7 +92,8 @@ export async function filterInfluencers(filters: InfluencerFilters) {
         ilike(influencers.primaryNiche, term),
         ilike(influencers.secondaryNiche, term),
         ilike(influencers.personality, term),
-        ilike(influencers.lifestyleTraits, term)
+        ilike(influencers.lifestyleTraits, term),
+        ilike(influencers.availability, term)
       )!
     );
   }
@@ -238,23 +239,35 @@ export async function filterInfluencers(filters: InfluencerFilters) {
 
   // ── Sort ──────────────────────────────────────────────────────────────────
   const orderFn = filters.sortOrder === "asc" ? asc : desc;
-  const sortColumn = {
-    name: influencers.name,
-    brandCost: influencers.brandCost,
-    netCost: influencers.netCost,
-    grossCost: influencers.grossCost,
-    createdAt: influencers.createdAt,
-  }[filters.sortBy ?? "createdAt"];
+
+  const followersSubquery = sql`(
+    SELECT MAX(${influencerSocials.followers})
+    FROM ${influencerSocials}
+    WHERE ${influencerSocials.influencerId} = ${influencers.id}
+  )`;
+
+  const sortExpr =
+    filters.sortBy === "followers"
+      ? orderFn(followersSubquery)
+      : orderFn(
+          {
+            name: influencers.name,
+            brandCost: influencers.brandCost,
+            netCost: influencers.netCost,
+            grossCost: influencers.grossCost,
+            createdAt: influencers.createdAt,
+          }[filters.sortBy ?? "createdAt"],
+        );
 
   // ── Run count + data in parallel ─────────────────────────────────────────
   const [countResult, data] = await Promise.all([
     db.select({ total: count() }).from(influencers).where(where),
     db.query.influencers.findMany({
       where,
-      with: { socials: true },
+      with: { socials: true, reviews: true },
       limit: pageSize,
       offset: (page - 1) * pageSize,
-      orderBy: [orderFn(sortColumn)],
+      orderBy: [sortExpr],
     }),
   ]);
 

@@ -66,6 +66,7 @@ export interface Influencer {
   createdAt: string;
   updatedAt: string;
   socials: Social[];
+  reviews?: Array<{ id: number; rating: number | null }>;
 }
 
 interface Review {

@@ -1,12 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState, useCallback } from "react";
-import { Instagram, Youtube, Facebook, MapPin, Download, X } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Instagram, Youtube, Facebook, MapPin, Download, X, ChevronDown, SearchX, Star } from "lucide-react";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
@@ -20,6 +19,13 @@ import {
 import { cn } from "@/lib/utils";
 import { InfluencerModal, type Influencer } from "@/components/InfluencerModal";
 import { ExportModal } from "@/components/ExportModal";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet";
 
 export const Route = createFileRoute("/_auth/influencers")({
   component: InfluencersPage,
@@ -48,8 +54,8 @@ interface FilterState {
   avgViewsMax: string;
   ratingMin: string;
   ratingMax: string;
-  location: string;
-  primaryNiche: string;
+  location: string[];
+  primaryNiche: string[];
   secondaryNiche: string;
   mainAgeGroup: string;
   videoStyle: string;
@@ -107,8 +113,8 @@ const EMPTY_FILTERS: FilterState = {
   avgViewsMax: "",
   ratingMin: "",
   ratingMax: "",
-  location: "",
-  primaryNiche: "",
+  location: [],
+  primaryNiche: [],
   secondaryNiche: "",
   mainAgeGroup: "",
   videoStyle: "",
@@ -131,6 +137,12 @@ function fmtFollowers(n: number | null) {
   if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
   return n.toLocaleString();
 }
+function calcAvgRating(reviews?: Array<{ rating: number | null }>) {
+  const ratings = reviews?.map((r) => r.rating).filter((r): r is number => r != null) ?? [];
+  if (!ratings.length) return null;
+  return ratings.reduce((a, b) => a + b, 0) / ratings.length;
+}
+
 const TIER_VARIANT: Record<string, "default" | "secondary" | "outline"> = {
   nano: "outline",
   micro: "secondary",
@@ -212,6 +224,75 @@ function MultiCheck({
   );
 }
 
+function TagInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string[];
+  onChange: (v: string[]) => void;
+  placeholder?: string;
+}) {
+  const [inputVal, setInputVal] = useState("");
+
+  function addTag(raw: string) {
+    const trimmed = raw.trim().replace(/,$/, "");
+    if (trimmed && !value.includes(trimmed)) {
+      onChange([...value, trimmed]);
+    }
+    setInputVal("");
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addTag(inputVal);
+    } else if (e.key === "Backspace" && !inputVal && value.length > 0) {
+      onChange(value.slice(0, -1));
+    }
+  }
+
+  return (
+    <div>
+      <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
+        {label}
+      </p>
+      <div className="flex flex-wrap gap-1.5 px-2 py-1.5 rounded-md border bg-background min-h-[34px] focus-within:ring-1 focus-within:ring-ring">
+        {value.map((tag) => (
+          <span
+            key={tag}
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-xs text-primary"
+          >
+            {tag}
+            <button
+              type="button"
+              onClick={() => onChange(value.filter((t) => t !== tag))}
+              className="hover:text-destructive"
+            >
+              <X className="size-3" />
+            </button>
+          </span>
+        ))}
+        <input
+          value={inputVal}
+          onChange={(e) => setInputVal(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={() => { if (inputVal.trim()) addTag(inputVal); }}
+          placeholder={value.length === 0 ? placeholder : ""}
+          className="flex-1 min-w-20 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+        />
+      </div>
+      {value.length === 0 && (
+        <p className="text-[11px] text-muted-foreground mt-1">
+          Press Enter or comma to add multiple values
+        </p>
+      )}
+    </div>
+  );
+}
+
 function RangeInput({
   label,
   minVal,
@@ -263,6 +344,51 @@ function RangeInput({
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+function FilterSection({
+  title,
+  activeCount = 0,
+  children,
+  defaultOpen = true,
+}: {
+  title: string;
+  activeCount?: number;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          "flex items-center gap-2 w-full px-4 py-3 text-left transition-colors hover:bg-muted/40 rounded-lg",
+          open && "rounded-b-none",
+        )}
+      >
+        <span className="text-sm font-semibold text-foreground">{title}</span>
+        {activeCount > 0 && (
+          <span className="rounded-full bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 leading-none">
+            {activeCount}
+          </span>
+        )}
+        <ChevronDown
+          className={cn(
+            "size-4 text-muted-foreground ml-auto transition-transform duration-200",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+      {open && (
+        <div className="px-4 pb-4 pt-1 grid grid-cols-1 gap-5 border-b border-border/50">
+          {children}
+        </div>
+      )}
+      {!open && <div className="border-b border-border/50" />}
     </div>
   );
 }
@@ -378,8 +504,8 @@ function filtersToBody(f: FilterState, page: number) {
         ...(f.ratingMax && { max: Number(f.ratingMax) }),
       },
     }),
-    ...(f.location && { location: [f.location] }),
-    ...(f.primaryNiche && { primaryNiche: [f.primaryNiche] }),
+    ...(f.location.length && { location: f.location }),
+    ...(f.primaryNiche.length && { primaryNiche: f.primaryNiche }),
     ...(f.secondaryNiche && { secondaryNiche: [f.secondaryNiche] }),
     ...(f.mainAgeGroup && { mainAgeGroup: [f.mainAgeGroup] }),
     ...(f.videoStyle && { videoStyle: [f.videoStyle] }),
@@ -393,6 +519,32 @@ function filtersToBody(f: FilterState, page: number) {
 
 function isFilterActive(f: FilterState) {
   return JSON.stringify(f) !== JSON.stringify(EMPTY_FILTERS);
+}
+
+type FilterChip = { label: string; keys: (keyof FilterState)[] };
+
+function computeFilterChips(f: FilterState): FilterChip[] {
+  const chips: FilterChip[] = [];
+  if (f.status.length) chips.push({ label: `Status: ${f.status.map((s) => fmt(s)).join(", ")}`, keys: ["status"] });
+  if (f.tier.length) chips.push({ label: `Tier: ${f.tier.join(", ")}`, keys: ["tier"] });
+  if (f.gender.length) chips.push({ label: `Gender: ${f.gender.map((g) => fmt(g)).join(", ")}`, keys: ["gender"] });
+  if (f.platform.length) chips.push({ label: `Platform: ${f.platform.join(", ")}`, keys: ["platform"] });
+  if (f.contentFrequency.length) chips.push({ label: `Frequency: ${f.contentFrequency.map((v) => fmt(v)).join(", ")}`, keys: ["contentFrequency"] });
+  if (f.contentQuality.length) chips.push({ label: `Quality: ${f.contentQuality.join(", ")}`, keys: ["contentQuality"] });
+  if (f.responsiveness.length) chips.push({ label: `Responsiveness: ${f.responsiveness.map((v) => fmt(v)).join(", ")}`, keys: ["responsiveness"] });
+  if (f.brandCostMin || f.brandCostMax) chips.push({ label: `Brand Cost: ${f.brandCostMin || "0"}–${f.brandCostMax || "∞"}`, keys: ["brandCostMin", "brandCostMax"] });
+  if (f.netCostMin || f.netCostMax) chips.push({ label: `Net Cost: ${f.netCostMin || "0"}–${f.netCostMax || "∞"}`, keys: ["netCostMin", "netCostMax"] });
+  if (f.grossCostMin || f.grossCostMax) chips.push({ label: `Gross Cost: ${f.grossCostMin || "0"}–${f.grossCostMax || "∞"}`, keys: ["grossCostMin", "grossCostMax"] });
+  if (f.followersMin || f.followersMax) chips.push({ label: `Followers: ${f.followersMin || "0"}–${f.followersMax || "∞"}`, keys: ["followersMin", "followersMax"] });
+  if (f.avgViewsMin || f.avgViewsMax) chips.push({ label: `Avg Views: ${f.avgViewsMin || "0"}–${f.avgViewsMax || "∞"}`, keys: ["avgViewsMin", "avgViewsMax"] });
+  if (f.ratingMin || f.ratingMax) chips.push({ label: `Rating: ${f.ratingMin || "1"}–${f.ratingMax || "5"}`, keys: ["ratingMin", "ratingMax"] });
+  if (f.location.length) chips.push({ label: `Location: ${f.location.join(", ")}`, keys: ["location"] });
+  if (f.primaryNiche.length) chips.push({ label: `Niche: ${f.primaryNiche.join(", ")}`, keys: ["primaryNiche"] });
+  if (f.secondaryNiche) chips.push({ label: `2nd Niche: ${f.secondaryNiche}`, keys: ["secondaryNiche"] });
+  if (f.mainAgeGroup) chips.push({ label: `Age Group: ${f.mainAgeGroup}`, keys: ["mainAgeGroup"] });
+  if (f.videoStyle) chips.push({ label: `Video Style: ${f.videoStyle}`, keys: ["videoStyle"] });
+  if (f.familyStatus) chips.push({ label: `Family: ${f.familyStatus}`, keys: ["familyStatus"] });
+  return chips;
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -421,6 +573,24 @@ function InfluencersPage() {
     setCommitted(EMPTY_FILTERS);
     setPage(1);
   }
+  function removeChip(keys: (keyof FilterState)[]) {
+    const patch = Object.fromEntries(
+      keys.map((k) => [k, EMPTY_FILTERS[k]]),
+    ) as Partial<FilterState>;
+    setFilters((f) => ({ ...f, ...patch }));
+    setCommitted((f) => ({ ...f, ...patch }));
+    setPage(1);
+  }
+
+  // Debounced auto-search: only commits the search field, not pending panel filters
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setCommitted((prev) => ({ ...prev, search: filters.search }));
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.search]);
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["influencers", "filter", committed, page],
@@ -435,6 +605,9 @@ function InfluencersPage() {
 
   const influencers = data?.data ?? [];
   const active = isFilterActive(committed);
+  const chips = computeFilterChips(committed);
+  // Count filter groups, excluding search (shown inline)
+  const filterCount = computeFilterChips({ ...committed, search: "" }).length;
 
   function toggleInfluencer(inf: Influencer) {
     setSelectedMap((prev) => {
@@ -479,14 +652,16 @@ function InfluencersPage() {
             </Button>
           )}
           <Button
-            variant={filtersOpen ? "secondary" : "outline"}
+            variant={filterCount > 0 ? "default" : "outline"}
             size="sm"
-            onClick={() => setFiltersOpen((o) => !o)}
+            onClick={() => setFiltersOpen(true)}
           >
-            {filtersOpen ? "Hide filters" : "Filters"}
-            {active && (
-              <span className="ml-1.5 size-2 rounded-full bg-primary inline-block" />
-            )}
+            Filters
+            {filterCount > 0 ? (
+              <span className="ml-1 rounded-full bg-primary-foreground/20 text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 leading-none">
+                {filterCount}
+              </span>
+            ) : null}
           </Button>
         </div>
       </div>
@@ -505,173 +680,136 @@ function InfluencersPage() {
         </Button>
       </div>
 
-      {/* Filter panel */}
-      {filtersOpen && (
-        <Card>
-          <CardContent className="pt-6 space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              <MultiCheck
-                label="Status"
-                options={STATUS_OPTS}
-                value={filters.status}
-                onChange={(v) => set("status", v)}
-              />
-              <MultiCheck
-                label="Tier"
-                options={TIER_OPTS}
-                value={filters.tier}
-                onChange={(v) => set("tier", v)}
-              />
-              <MultiCheck
-                label="Platform"
-                options={PLATFORM_OPTS}
-                value={filters.platform}
-                onChange={(v) => set("platform", v)}
-              />
-              <MultiCheck
-                label="Gender"
-                options={GENDER_OPTS}
-                value={filters.gender}
-                onChange={(v) => set("gender", v)}
-              />
-              <MultiCheck
-                label="Content Frequency"
-                options={FREQUENCY_OPTS}
-                value={filters.contentFrequency}
-                onChange={(v) => set("contentFrequency", v)}
-              />
-              <MultiCheck
-                label="Content Quality"
-                options={QUALITY_OPTS}
-                value={filters.contentQuality}
-                onChange={(v) => set("contentQuality", v)}
-              />
-              <MultiCheck
-                label="Responsiveness"
-                options={RESPONSIVENESS_OPTS}
-                value={filters.responsiveness}
-                onChange={(v) => set("responsiveness", v)}
-              />
-              <RangeInput
-                label="Brand Cost (रू)"
-                minVal={filters.brandCostMin}
-                maxVal={filters.brandCostMax}
-                onMinChange={(v) => set("brandCostMin", v)}
-                onMaxChange={(v) => set("brandCostMax", v)}
-              />
-              <RangeInput
-                label="Net Cost (रू)"
-                minVal={filters.netCostMin}
-                maxVal={filters.netCostMax}
-                onMinChange={(v) => set("netCostMin", v)}
-                onMaxChange={(v) => set("netCostMax", v)}
-              />
-              <RangeInput
-                label="Gross Cost (रू)"
-                minVal={filters.grossCostMin}
-                maxVal={filters.grossCostMax}
-                onMinChange={(v) => set("grossCostMin", v)}
-                onMaxChange={(v) => set("grossCostMax", v)}
-              />
-              <RangeInput
-                label="Followers"
-                minVal={filters.followersMin}
-                maxVal={filters.followersMax}
-                onMinChange={(v) => set("followersMin", v)}
-                onMaxChange={(v) => set("followersMax", v)}
-              />
-              <RangeInput
-                label="Avg Views"
-                minVal={filters.avgViewsMin}
-                maxVal={filters.avgViewsMax}
-                onMinChange={(v) => set("avgViewsMin", v)}
-                onMaxChange={(v) => set("avgViewsMax", v)}
-              />
-              <RangeInput
-                label="Rating (1–5)"
-                minVal={filters.ratingMin}
-                maxVal={filters.ratingMax}
-                onMinChange={(v) => set("ratingMin", v)}
-                onMaxChange={(v) => set("ratingMax", v)}
-              />
-              <div>
-                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                  Location
-                </Label>
-                <Input
-                  placeholder="e.g. Kathmandu"
-                  value={filters.location}
-                  onChange={(e) => set("location", e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                  Primary Niche
-                </Label>
-                <Input
-                  placeholder="e.g. Lifestyle"
-                  value={filters.primaryNiche}
-                  onChange={(e) => set("primaryNiche", e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                  Secondary Niche
-                </Label>
-                <Input
-                  placeholder="e.g. Travel"
-                  value={filters.secondaryNiche}
-                  onChange={(e) => set("secondaryNiche", e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                  Main Age Group
-                </Label>
-                <Input
-                  placeholder="e.g. 18-24"
-                  value={filters.mainAgeGroup}
-                  onChange={(e) => set("mainAgeGroup", e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                  Video Style
-                </Label>
-                <Input
-                  placeholder="e.g. Vlog"
-                  value={filters.videoStyle}
-                  onChange={(e) => set("videoStyle", e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                  Family Status
-                </Label>
-                <Input
-                  placeholder="e.g. Married"
-                  value={filters.familyStatus}
-                  onChange={(e) => set("familyStatus", e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-2 border-t">
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                Reset
-              </Button>
-              <Button size="sm" onClick={applyFilters}>
-                Apply filters
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Active filter chips */}
+      {chips.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {chips.map((chip) => (
+            <span
+              key={chip.keys.join(",")}
+              className="flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full border border-primary/30 bg-primary/5 text-xs text-foreground"
+            >
+              {chip.label}
+              <button
+                type="button"
+                onClick={() => removeChip(chip.keys)}
+                className="rounded-full hover:bg-primary/15 p-0.5"
+              >
+                <X className="size-3 text-muted-foreground" />
+              </button>
+            </span>
+          ))}
+        </div>
       )}
+
+      {/* Filter sheet */}
+      <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <SheetContent side="right" showCloseButton={false} className="w-[380px] sm:max-w-[380px] p-0 flex flex-col gap-0">
+          {/* Sheet header */}
+          <SheetHeader className="px-5 py-4 border-b flex-row items-center justify-between gap-3 shrink-0">
+            <div className="flex items-center gap-2">
+              <SheetTitle className="text-base">Filters</SheetTitle>
+              {filterCount > 0 && (
+                <span className="rounded-full bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 leading-none">
+                  {filterCount} active
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              {active && (
+                <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => { clearFilters(); setFiltersOpen(false); }}>
+                  Clear all
+                </Button>
+              )}
+              <Button variant="ghost" size="icon-sm" onClick={() => setFiltersOpen(false)}>
+                <X className="size-4" />
+              </Button>
+            </div>
+          </SheetHeader>
+
+          {/* Scrollable body */}
+          <div className="flex-1 overflow-y-auto">
+            {(() => {
+              const basicCount = [
+                filters.status.length, filters.tier.length, filters.gender.length,
+                filters.responsiveness.length, filters.mainAgeGroup ? 1 : 0, filters.familyStatus ? 1 : 0,
+              ].reduce((a, b) => a + b, 0);
+
+              const contentCount = [
+                filters.platform.length, filters.contentFrequency.length, filters.contentQuality.length,
+                filters.primaryNiche.length, filters.secondaryNiche ? 1 : 0, filters.videoStyle ? 1 : 0,
+              ].reduce((a, b) => a + b, 0);
+
+              const reachCount = [
+                filters.followersMin || filters.followersMax ? 1 : 0,
+                filters.avgViewsMin || filters.avgViewsMax ? 1 : 0,
+                filters.ratingMin || filters.ratingMax ? 1 : 0,
+                filters.brandCostMin || filters.brandCostMax ? 1 : 0,
+                filters.netCostMin || filters.netCostMax ? 1 : 0,
+                filters.grossCostMin || filters.grossCostMax ? 1 : 0,
+              ].reduce((a, b) => a + b, 0);
+
+              const locationCount = filters.location.length;
+
+              return (
+                <>
+                  <FilterSection title="Basic" activeCount={basicCount}>
+                    <MultiCheck label="Status" options={STATUS_OPTS} value={filters.status} onChange={(v) => set("status", v)} />
+                    <MultiCheck label="Tier" options={TIER_OPTS} value={filters.tier} onChange={(v) => set("tier", v)} />
+                    <MultiCheck label="Gender" options={GENDER_OPTS} value={filters.gender} onChange={(v) => set("gender", v)} />
+                    <MultiCheck label="Responsiveness" options={RESPONSIVENESS_OPTS} value={filters.responsiveness} onChange={(v) => set("responsiveness", v)} />
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">Main Age Group</Label>
+                      <Input placeholder="e.g. 18-24" value={filters.mainAgeGroup} onChange={(e) => set("mainAgeGroup", e.target.value)} className="h-8 text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">Family Status</Label>
+                      <Input placeholder="e.g. Married" value={filters.familyStatus} onChange={(e) => set("familyStatus", e.target.value)} className="h-8 text-sm" />
+                    </div>
+                  </FilterSection>
+
+                  <FilterSection title="Content" activeCount={contentCount}>
+                    <MultiCheck label="Platform" options={PLATFORM_OPTS} value={filters.platform} onChange={(v) => set("platform", v)} />
+                    <MultiCheck label="Content Frequency" options={FREQUENCY_OPTS} value={filters.contentFrequency} onChange={(v) => set("contentFrequency", v)} />
+                    <MultiCheck label="Content Quality" options={QUALITY_OPTS} value={filters.contentQuality} onChange={(v) => set("contentQuality", v)} />
+                    <TagInput label="Primary Niche" value={filters.primaryNiche} onChange={(v) => set("primaryNiche", v)} placeholder="e.g. Lifestyle" />
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">Secondary Niche</Label>
+                      <Input placeholder="e.g. Travel" value={filters.secondaryNiche} onChange={(e) => set("secondaryNiche", e.target.value)} className="h-8 text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">Video Style</Label>
+                      <Input placeholder="e.g. Vlog" value={filters.videoStyle} onChange={(e) => set("videoStyle", e.target.value)} className="h-8 text-sm" />
+                    </div>
+                  </FilterSection>
+
+                  <FilterSection title="Reach & Cost" activeCount={reachCount} defaultOpen={false}>
+                    <RangeInput label="Followers" minVal={filters.followersMin} maxVal={filters.followersMax} onMinChange={(v) => set("followersMin", v)} onMaxChange={(v) => set("followersMax", v)} />
+                    <RangeInput label="Avg Views" minVal={filters.avgViewsMin} maxVal={filters.avgViewsMax} onMinChange={(v) => set("avgViewsMin", v)} onMaxChange={(v) => set("avgViewsMax", v)} />
+                    <RangeInput label="Rating (1–5)" minVal={filters.ratingMin} maxVal={filters.ratingMax} onMinChange={(v) => set("ratingMin", v)} onMaxChange={(v) => set("ratingMax", v)} />
+                    <RangeInput label="Brand Cost (रू)" minVal={filters.brandCostMin} maxVal={filters.brandCostMax} onMinChange={(v) => set("brandCostMin", v)} onMaxChange={(v) => set("brandCostMax", v)} />
+                    <RangeInput label="Net Cost (रू)" minVal={filters.netCostMin} maxVal={filters.netCostMax} onMinChange={(v) => set("netCostMin", v)} onMaxChange={(v) => set("netCostMax", v)} />
+                    <RangeInput label="Gross Cost (रू)" minVal={filters.grossCostMin} maxVal={filters.grossCostMax} onMinChange={(v) => set("grossCostMin", v)} onMaxChange={(v) => set("grossCostMax", v)} />
+                  </FilterSection>
+
+                  <FilterSection title="Location" activeCount={locationCount} defaultOpen={false}>
+                    <TagInput label="Location" value={filters.location} onChange={(v) => set("location", v)} placeholder="e.g. Kathmandu" />
+                  </FilterSection>
+                </>
+              );
+            })()}
+          </div>
+
+          {/* Footer */}
+          <SheetFooter className="border-t p-4 flex-row gap-2">
+            <Button variant="outline" className="flex-1" onClick={clearFilters}>
+              Reset
+            </Button>
+            <Button className="flex-1" onClick={() => { applyFilters(); setFiltersOpen(false); }}>
+              Apply filters
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {/* Table */}
       <div
@@ -685,8 +823,7 @@ function InfluencersPage() {
             <TableRow className="bg-muted/40">
               <TableHead className="w-10">
                 <Checkbox
-                  checked={allPageSelected}
-                  data-state={somePageSelected && !allPageSelected ? "indeterminate" : undefined}
+                  checked={somePageSelected && !allPageSelected ? "indeterminate" : allPageSelected}
                   onCheckedChange={toggleAllPage}
                   aria-label="Select all on page"
                 />
@@ -694,19 +831,19 @@ function InfluencersPage() {
               <TableHead>Name</TableHead>
               <TableHead>Tier</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Gender</TableHead>
               <TableHead>Niche</TableHead>
               <TableHead>Location</TableHead>
               <TableHead>Socials</TableHead>
               <TableHead className="text-right">Brand Cost</TableHead>
-              <TableHead>Frequency</TableHead>
+              <TableHead className="text-right">Net Cost</TableHead>
+              <TableHead>Rating</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               Array.from({ length: 10 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 10 }).map((_, j) => (
+                  {Array.from({ length: 9 }).map((_, j) => (
                     <TableCell key={j}>
                       <div
                         className="h-4 rounded bg-muted animate-pulse"
@@ -718,12 +855,14 @@ function InfluencersPage() {
               ))
             ) : influencers.length === 0 ? (
               <TableRow>
-                <TableCell
-                  colSpan={10}
-                  className="text-center py-16 text-muted-foreground"
-                >
-                  No influencers found.
-                  {active && " Try adjusting your filters."}
+                <TableCell colSpan={9} className="py-20">
+                  <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                    <SearchX className="size-10 opacity-30" />
+                    <p className="text-sm font-medium">No influencers found</p>
+                    {active && (
+                      <p className="text-xs">Try adjusting or clearing your filters.</p>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -767,9 +906,6 @@ function InfluencersPage() {
                       {inf.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="capitalize text-sm">
-                    {fmt(inf.gender)}
-                  </TableCell>
                   <TableCell>
                     <span className="block text-sm">
                       {inf.primaryNiche ?? "—"}
@@ -794,14 +930,14 @@ function InfluencersPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-1">
                       {inf.socials.length === 0 ? (
                         <span className="text-muted-foreground text-xs">—</span>
                       ) : (
                         inf.socials.map((s) => (
                           <div
                             key={s.id}
-                            className="flex items-center gap-1"
+                            className="flex items-center gap-1.5"
                             title={`${s.platform}: ${s.followers != null ? fmtFollowers(s.followers) : "no data"}`}
                           >
                             <span className={PLATFORM_COLOR[s.platform]}>
@@ -812,6 +948,11 @@ function InfluencersPage() {
                                 {fmtFollowers(s.followers)}
                               </span>
                             )}
+                            {s.avgViews != null && (
+                              <span className="text-xs text-muted-foreground/60">
+                                · {fmtFollowers(s.avgViews)} views
+                              </span>
+                            )}
                           </div>
                         ))
                       )}
@@ -820,8 +961,20 @@ function InfluencersPage() {
                   <TableCell className="text-right font-mono text-sm">
                     {fmtNpr(inf.brandCost)}
                   </TableCell>
-                  <TableCell className="capitalize text-sm">
-                    {fmt(inf.contentFrequency)}
+                  <TableCell className="text-right font-mono text-sm">
+                    {fmtNpr(inf.netCost)}
+                  </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const avg = calcAvgRating(inf.reviews);
+                      if (avg == null) return <span className="text-muted-foreground text-xs">—</span>;
+                      return (
+                        <div className="flex items-center gap-1">
+                          <Star className="size-3 fill-yellow-400 text-yellow-400" />
+                          <span className="text-xs font-medium">{avg.toFixed(1)}</span>
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                 </TableRow>
               ))
