@@ -823,7 +823,8 @@ function InfluencersPage() {
             <TableRow className="bg-muted/40">
               <TableHead className="w-10">
                 <Checkbox
-                  checked={somePageSelected && !allPageSelected ? "indeterminate" : allPageSelected}
+                  indeterminate={somePageSelected && !allPageSelected}
+                  checked={allPageSelected}
                   onCheckedChange={toggleAllPage}
                   aria-label="Select all on page"
                 />
