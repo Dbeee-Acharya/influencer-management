@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: "influencer-api",
-      script: "./dist/index.js",
+      script: "./dist/src/index.js",
       instances: 2,
       exec_mode: "cluster",
       max_memory_restart: "600M",
