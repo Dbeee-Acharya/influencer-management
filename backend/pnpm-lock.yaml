@@ -30,6 +30,9 @@ importers:
       '@types/pg':
         specifier: ^8.18.0
         version: 8.18.0
+      csv-parse:
+        specifier: ^6.2.0
+        version: 6.2.0
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
@@ -512,6 +515,9 @@ packages:
   buffer-from@1.1.2:
     resolution: {integrity: sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==}
 
+  csv-parse@6.2.0:
+    resolution: {integrity: sha512-Zv8KRHccD1q3BJlK4VcQiEn/+suOOp++89g/fpqOxB2U2tU66uC3yM+ZwU6nQQEJp8AqBIiNqB+pUTKNz4QzKg==}
+
   dotenv@17.3.1:
     resolution: {integrity: sha512-IO8C/dzEb6O3F9/twg6ZLXz164a2fhTnEWb95H23Dm4OuN+92NmEAlTrupP9VW6Jm3sO26tQlqyvyi4CsnY9GA==}
     engines: {node: '>=12'}
@@ -971,6 +977,8 @@ snapshots:
       pg-types: 2.2.0
 
   buffer-from@1.1.2: {}
+
+  csv-parse@6.2.0: {}
 
   dotenv@17.3.1: {}
 
