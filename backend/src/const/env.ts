@@ -7,4 +7,7 @@ export const ENV_VARS = {
   database: {
     database_url: process.env.DATABASE_URL!,
   },
+  auth: {
+    jwt_secret: process.env.JWT_SECRET!,
+  },
 };
