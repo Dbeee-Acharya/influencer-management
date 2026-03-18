@@ -182,9 +182,7 @@ export async function filterInfluencers(filters: InfluencerFilters) {
     );
 
   if (filters.familyStatus?.length)
-    conditions.push(
-      or(...filters.familyStatus.map((v) => ilike(influencers.familyStatus, `%${v}%`)))!
-    );
+    conditions.push(inArray(influencers.familyStatus, filters.familyStatus));
 
   // ── Socials filter — all conditions apply to the SAME social account ──────
   const socialConditions: SQL[] = [];
