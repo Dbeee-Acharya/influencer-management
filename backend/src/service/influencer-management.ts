@@ -1,6 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { influencers, influencerSocials, influencerReviews } from "../db/schema.js";
+import { invalidateFilterCache } from "../db/redis.js";
 
 type InfluencerInsert = typeof influencers.$inferInsert;
 type SocialInsert = Omit<typeof influencerSocials.$inferInsert, "influencerId">;
@@ -28,6 +29,7 @@ export async function createInfluencer(
       .values(socials.map((s) => ({ ...s, influencerId: created.id })));
   }
 
+  await invalidateFilterCache().catch(() => null);
   return created;
 }
 
@@ -41,6 +43,7 @@ export async function updateInfluencer(
     .where(eq(influencers.id, id))
     .returning();
 
+  await invalidateFilterCache().catch(() => null);
   return updated ?? null;
 }
 
@@ -50,6 +53,7 @@ export async function deleteInfluencer(id: string) {
     .where(eq(influencers.id, id))
     .returning({ id: influencers.id });
 
+  await invalidateFilterCache().catch(() => null);
   return deleted ?? null;
 }
 
@@ -61,6 +65,7 @@ export async function addSocial(influencerId: string, data: SocialInsert) {
     .values({ ...data, influencerId })
     .returning();
 
+  await invalidateFilterCache().catch(() => null);
   return social;
 }
 
@@ -74,6 +79,7 @@ export async function updateSocial(
     .where(eq(influencerSocials.id, socialId))
     .returning();
 
+  await invalidateFilterCache().catch(() => null);
   return updated ?? null;
 }
 
@@ -83,6 +89,7 @@ export async function deleteSocial(socialId: number) {
     .where(eq(influencerSocials.id, socialId))
     .returning({ id: influencerSocials.id });
 
+  await invalidateFilterCache().catch(() => null);
   return deleted ?? null;
 }
 
@@ -106,5 +113,7 @@ export async function addReview(
     .insert(influencerReviews)
     .values({ influencerId, staffId, rating, review })
     .returning();
+
+  await invalidateFilterCache().catch(() => null);
   return created;
 }

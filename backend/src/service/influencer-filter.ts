@@ -17,6 +17,7 @@ import {
   influencerSocials,
   influencerReviews,
 } from "../db/schema.js";
+import { redis, FILTER_CACHE_TTL, buildFilterCacheKey, getCacheVersion } from "../db/redis.js";
 
 export type RangeFilter = { min?: number; max?: number };
 
@@ -77,6 +78,14 @@ export type InfluencerFilters = {
 };
 
 export async function filterInfluencers(filters: InfluencerFilters) {
+  // Version is null when Redis is unreachable — skip cache entirely
+  const version = await getCacheVersion();
+  const cacheKey = version ? buildFilterCacheKey(version, filters) : null;
+  if (cacheKey) {
+    const cached = await redis.get(cacheKey).catch(() => null);
+    if (cached) return JSON.parse(cached);
+  }
+
   const page = Math.max(filters.page ?? 1, 1);
   const pageSize = Math.min(filters.pageSize ?? 20, 100);
   const conditions: SQL[] = [];
@@ -271,11 +280,17 @@ export async function filterInfluencers(filters: InfluencerFilters) {
 
   const total = countResult[0].total;
 
-  return {
+  const result = {
     data,
     total,
     page,
     pageSize,
     totalPages: Math.ceil(total / pageSize),
   };
+
+  if (cacheKey) {
+    await redis.set(cacheKey, JSON.stringify(result), "EX", FILTER_CACHE_TTL).catch(() => null);
+  }
+
+  return result;
 }
