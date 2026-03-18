@@ -18,15 +18,21 @@ export const Route = createFileRoute("/_auth")({
   component: AuthLayout,
 });
 
-const navLinks = [
+const baseNavLinks = [
   { to: "/", label: "Dashboard", exact: true },
   { to: "/influencers", label: "Influencers", exact: false },
+] as const;
+
+const adminNavLinks = [
+  ...baseNavLinks,
+  { to: "/staff", label: "Staff", exact: false },
 ] as const;
 
 function AuthLayout() {
   const { staff, logout } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navLinks = staff?.role === "admin" ? adminNavLinks : baseNavLinks;
 
   function handleLogout() {
     logout();

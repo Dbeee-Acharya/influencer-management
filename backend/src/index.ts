@@ -6,6 +6,7 @@ import { ENV_VARS } from "./const/env.js";
 import { adminAuth } from "./middlewares/admin-auth.js";
 import type { AuthVariables } from "./middlewares/admin-auth.js";
 import { staffAuth } from "./routes/staff-auth.js";
+import { staffManagement } from "./routes/staff-management.js";
 import { influencerManagement } from "./routes/influencer-management.js";
 import { influencerFilter } from "./routes/influencer-filter.js";
 
@@ -32,6 +33,7 @@ app.use("*", async (c, next) => {
 
 app.get("/", (c) => c.text("Online!"));
 
+app.route("/staff", staffManagement);
 app.route("/influencers", influencerFilter);
 app.route("/influencers", influencerManagement);
 

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as AuthIndexRouteImport } from './routes/_auth/index'
+import { Route as AuthStaffRouteImport } from './routes/_auth/staff'
 import { Route as AuthInfluencersRouteImport } from './routes/_auth/influencers'
 
 const LoginRoute = LoginRouteImport.update({
@@ -28,6 +29,11 @@ const AuthIndexRoute = AuthIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthRoute,
 } as any)
+const AuthStaffRoute = AuthStaffRouteImport.update({
+  id: '/staff',
+  path: '/staff',
+  getParentRoute: () => AuthRoute,
+} as any)
 const AuthInfluencersRoute = AuthInfluencersRouteImport.update({
   id: '/influencers',
   path: '/influencers',
@@ -38,10 +44,12 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthIndexRoute
   '/login': typeof LoginRoute
   '/influencers': typeof AuthInfluencersRoute
+  '/staff': typeof AuthStaffRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/influencers': typeof AuthInfluencersRoute
+  '/staff': typeof AuthStaffRoute
   '/': typeof AuthIndexRoute
 }
 export interface FileRoutesById {
@@ -49,14 +57,21 @@ export interface FileRoutesById {
   '/_auth': typeof AuthRouteWithChildren
   '/login': typeof LoginRoute
   '/_auth/influencers': typeof AuthInfluencersRoute
+  '/_auth/staff': typeof AuthStaffRoute
   '/_auth/': typeof AuthIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/influencers'
+  fullPaths: '/' | '/login' | '/influencers' | '/staff'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/influencers' | '/'
-  id: '__root__' | '/_auth' | '/login' | '/_auth/influencers' | '/_auth/'
+  to: '/login' | '/influencers' | '/staff' | '/'
+  id:
+    | '__root__'
+    | '/_auth'
+    | '/login'
+    | '/_auth/influencers'
+    | '/_auth/staff'
+    | '/_auth/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -87,6 +102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthIndexRouteImport
       parentRoute: typeof AuthRoute
     }
+    '/_auth/staff': {
+      id: '/_auth/staff'
+      path: '/staff'
+      fullPath: '/staff'
+      preLoaderRoute: typeof AuthStaffRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/influencers': {
       id: '/_auth/influencers'
       path: '/influencers'
@@ -99,11 +121,13 @@ declare module '@tanstack/react-router' {
 
 interface AuthRouteChildren {
   AuthInfluencersRoute: typeof AuthInfluencersRoute
+  AuthStaffRoute: typeof AuthStaffRoute
   AuthIndexRoute: typeof AuthIndexRoute
 }
 
 const AuthRouteChildren: AuthRouteChildren = {
   AuthInfluencersRoute: AuthInfluencersRoute,
+  AuthStaffRoute: AuthStaffRoute,
   AuthIndexRoute: AuthIndexRoute,
 }
 
