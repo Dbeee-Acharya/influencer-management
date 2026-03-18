@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { influencers, influencerSocials } from "../db/schema.js";
+import { influencers, influencerSocials, influencerReviews } from "../db/schema.js";
 
 type InfluencerInsert = typeof influencers.$inferInsert;
 type SocialInsert = Omit<typeof influencerSocials.$inferInsert, "influencerId">;
@@ -84,4 +84,27 @@ export async function deleteSocial(socialId: number) {
     .returning({ id: influencerSocials.id });
 
   return deleted ?? null;
+}
+
+// --- Reviews ---
+
+export async function getReviews(influencerId: string) {
+  return db.query.influencerReviews.findMany({
+    where: eq(influencerReviews.influencerId, influencerId),
+    with: { staff: { columns: { id: true, name: true } } },
+    orderBy: [desc(influencerReviews.createdAt)],
+  });
+}
+
+export async function addReview(
+  influencerId: string,
+  staffId: number,
+  rating: number | null,
+  review: string | null
+) {
+  const [created] = await db
+    .insert(influencerReviews)
+    .values({ influencerId, staffId, rating, review })
+    .returning();
+  return created;
 }

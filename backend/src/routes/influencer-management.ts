@@ -94,4 +94,22 @@ influencerManagement.delete("/:id/socials/:socialId", async (c) => {
   return c.json({ success: true });
 });
 
+// --- Reviews ---
+
+influencerManagement.get("/:id/reviews", async (c) => {
+  return c.json(await svc.getReviews(c.req.param("id")));
+});
+
+influencerManagement.post("/:id/reviews", async (c) => {
+  const { rating, review } = await c.req.json<{ rating?: number; review?: string }>();
+  const staff = c.get("staff");
+  const created = await svc.addReview(
+    c.req.param("id"),
+    Number(staff.sub),
+    rating ?? null,
+    review ?? null
+  );
+  return c.json(created, 201);
+});
+
 export { influencerManagement };
