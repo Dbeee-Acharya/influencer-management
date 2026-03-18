@@ -6,6 +6,7 @@ import { adminAuth } from "./middlewares/admin-auth.js";
 import type { AuthVariables } from "./middlewares/admin-auth.js";
 import { staffAuth } from "./routes/staff-auth.js";
 import { influencerManagement } from "./routes/influencer-management.js";
+import { influencerFilter } from "./routes/influencer-filter.js";
 
 const app = new Hono<{ Variables: AuthVariables }>();
 
@@ -20,6 +21,7 @@ app.use("*", async (c, next) => {
 
 app.get("/", (c) => c.text("Online!"));
 
+app.route("/influencers", influencerFilter);
 app.route("/influencers", influencerManagement);
 
 serve(
