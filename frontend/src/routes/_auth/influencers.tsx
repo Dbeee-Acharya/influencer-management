@@ -667,12 +667,12 @@ function CreateInfluencerDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl p-0 gap-0 flex flex-col">
+      <DialogContent className="w-[90vw] max-w-3xl p-0 gap-0 flex flex-col max-h-[90vh]">
         <div className="px-6 pt-6 pb-4 border-b shrink-0">
           <DialogTitle>Add Influencer</DialogTitle>
         </div>
 
-        <Tabs value={tab} onValueChange={setTab} className="flex flex-col flex-1 min-h-0">
+        <Tabs value={tab} onValueChange={setTab} className="flex flex-col min-h-0 flex-1">
           <TabsList className="mx-6 mt-4 w-auto justify-start shrink-0">
             <TabsTrigger value="basic">Basic</TabsTrigger>
             <TabsTrigger value="content">Content</TabsTrigger>
@@ -680,7 +680,7 @@ function CreateInfluencerDialog({
             <TabsTrigger value="socials">Socials {socials.length > 0 && `(${socials.length})`}</TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="flex-1 min-h-0 max-h-[440px]">
+          <ScrollArea className="flex-1 min-h-0 mt-2">
             <TabsContent value="basic" className="px-6 py-4 grid grid-cols-2 gap-4 mt-0">
               <div className="col-span-2">
                 <Label>Name <span className="text-destructive">*</span></Label>
