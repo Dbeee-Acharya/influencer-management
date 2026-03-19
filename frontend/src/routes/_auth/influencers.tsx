@@ -1,13 +1,30 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useCallback, useEffect } from "react";
-import { Instagram, Youtube, Facebook, MapPin, Download, X, ChevronDown, SearchX, Star } from "lucide-react";
+import { Instagram, Youtube, Facebook, MapPin, Download, X, ChevronDown, SearchX, Star, Plus } from "lucide-react";
+import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { useAuth } from "@/context/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -547,13 +564,320 @@ function computeFilterChips(f: FilterState): FilterChip[] {
   return chips;
 }
 
+// ── Create Influencer Dialog ───────────────────────────────────────────────────
+
+interface SocialDraft {
+  platform: "instagram" | "tiktok" | "facebook" | "youtube";
+  profileUrl: string;
+  followers: string;
+  avgViews: string;
+}
+
+const EMPTY_SOCIAL: SocialDraft = { platform: "instagram", profileUrl: "", followers: "", avgViews: "" };
+
+const EMPTY_CREATE_FORM = {
+  name: "",
+  primaryLocation: "",
+  secondaryLocation: "",
+  tertiaryLocation: "",
+  tier: "",
+  status: "active",
+  gender: "",
+  contactNo: "",
+  description: "",
+  familyStatus: "",
+  mainAgeGroup: "",
+  primaryNiche: "",
+  secondaryNiche: "",
+  contentFrequency: "",
+  contentQuality: "",
+  videoStyle: "",
+  personality: "",
+  lifestyleTraits: "",
+  responsiveness: "",
+  availability: "",
+  brandCost: "",
+  netCost: "",
+  grossCost: "",
+  bio: "",
+};
+
+function CreateInfluencerDialog({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [form, setForm] = useState({ ...EMPTY_CREATE_FORM });
+  const [socials, setSocials] = useState<SocialDraft[]>([]);
+  const [tab, setTab] = useState("basic");
+
+  function setField(key: keyof typeof EMPTY_CREATE_FORM, val: string | null) {
+    setForm((f) => ({ ...f, [key]: val ?? "" }));
+  }
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const body: Record<string, unknown> = {
+        name: form.name,
+        primaryLocation: form.primaryLocation,
+      };
+      const optionalStr = [
+        "secondaryLocation", "tertiaryLocation", "tier", "status", "gender",
+        "contactNo", "description", "familyStatus", "mainAgeGroup",
+        "primaryNiche", "secondaryNiche", "contentFrequency", "contentQuality",
+        "videoStyle", "personality", "lifestyleTraits", "responsiveness",
+        "availability", "bio",
+      ] as const;
+      for (const k of optionalStr) {
+        if (form[k]) body[k] = form[k];
+      }
+      if (form.brandCost) body.brandCost = form.brandCost;
+      if (form.netCost) body.netCost = form.netCost;
+      if (form.grossCost) body.grossCost = form.grossCost;
+      if (socials.length) {
+        body.socials = socials.map((s) => ({
+          platform: s.platform,
+          ...(s.profileUrl && { profileUrl: s.profileUrl }),
+          ...(s.followers && { followers: Number(s.followers) }),
+          ...(s.avgViews && { avgViews: Number(s.avgViews) }),
+        }));
+      }
+      await api.post("/influencers", body);
+    },
+    onSuccess: () => {
+      toast.success("Influencer created");
+      onCreated();
+      onClose();
+      setForm({ ...EMPTY_CREATE_FORM });
+      setSocials([]);
+      setTab("basic");
+    },
+    onError: () => {
+      toast.error("Failed to create influencer");
+    },
+  });
+
+  function updateSocial(i: number, key: keyof SocialDraft, val: string) {
+    setSocials((s) => s.map((social, idx) => (idx === i ? { ...social, [key]: val } : social)));
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl p-0 gap-0 flex flex-col">
+        <div className="px-6 pt-6 pb-4 border-b shrink-0">
+          <DialogTitle>Add Influencer</DialogTitle>
+        </div>
+
+        <Tabs value={tab} onValueChange={setTab} className="flex flex-col flex-1 min-h-0">
+          <TabsList className="mx-6 mt-4 w-auto justify-start shrink-0">
+            <TabsTrigger value="basic">Basic</TabsTrigger>
+            <TabsTrigger value="content">Content</TabsTrigger>
+            <TabsTrigger value="costs">Costs</TabsTrigger>
+            <TabsTrigger value="socials">Socials {socials.length > 0 && `(${socials.length})`}</TabsTrigger>
+          </TabsList>
+
+          <ScrollArea className="flex-1 min-h-0 max-h-[440px]">
+            <TabsContent value="basic" className="px-6 py-4 grid grid-cols-2 gap-4 mt-0">
+              <div className="col-span-2">
+                <Label>Name <span className="text-destructive">*</span></Label>
+                <Input value={form.name} onChange={(e) => setField("name", e.target.value)} placeholder="Influencer name" className="mt-1" />
+              </div>
+              <div className="col-span-2">
+                <Label>Primary Location <span className="text-destructive">*</span></Label>
+                <Input value={form.primaryLocation} onChange={(e) => setField("primaryLocation", e.target.value)} placeholder="e.g. Kathmandu" className="mt-1" />
+              </div>
+              <div>
+                <Label>Tier</Label>
+                <Select value={form.tier} onValueChange={(v) => setField("tier", v)}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select tier" /></SelectTrigger>
+                  <SelectContent>
+                    {TIER_OPTS.map((t) => <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Status</Label>
+                <Select value={form.status} onValueChange={(v) => setField("status", v)}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTS.map((s) => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Gender</Label>
+                <Select value={form.gender} onValueChange={(v) => setField("gender", v)}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select gender" /></SelectTrigger>
+                  <SelectContent>
+                    {GENDER_OPTS.map((g) => <SelectItem key={g} value={g}>{fmt(g)}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Contact No.</Label>
+                <Input value={form.contactNo} onChange={(e) => setField("contactNo", e.target.value)} placeholder="+977 …" className="mt-1" />
+              </div>
+              <div>
+                <Label>Main Age Group</Label>
+                <Input value={form.mainAgeGroup} onChange={(e) => setField("mainAgeGroup", e.target.value)} placeholder="e.g. 18-24" className="mt-1" />
+              </div>
+              <div>
+                <Label>Family Status</Label>
+                <Input value={form.familyStatus} onChange={(e) => setField("familyStatus", e.target.value)} placeholder="e.g. Married" className="mt-1" />
+              </div>
+              <div>
+                <Label>Secondary Location</Label>
+                <Input value={form.secondaryLocation} onChange={(e) => setField("secondaryLocation", e.target.value)} placeholder="e.g. Pokhara" className="mt-1" />
+              </div>
+              <div>
+                <Label>Tertiary Location</Label>
+                <Input value={form.tertiaryLocation} onChange={(e) => setField("tertiaryLocation", e.target.value)} className="mt-1" />
+              </div>
+              <div className="col-span-2">
+                <Label>Description</Label>
+                <Textarea value={form.description} onChange={(e) => setField("description", e.target.value)} placeholder="Short internal description" className="mt-1 resize-none" rows={2} />
+              </div>
+              <div className="col-span-2">
+                <Label>Bio</Label>
+                <Textarea value={form.bio} onChange={(e) => setField("bio", e.target.value)} placeholder="Public biography" className="mt-1 resize-none" rows={2} />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="content" className="px-6 py-4 grid grid-cols-2 gap-4 mt-0">
+              <div>
+                <Label>Primary Niche</Label>
+                <Input value={form.primaryNiche} onChange={(e) => setField("primaryNiche", e.target.value)} placeholder="e.g. Fitness" className="mt-1" />
+              </div>
+              <div>
+                <Label>Secondary Niche</Label>
+                <Input value={form.secondaryNiche} onChange={(e) => setField("secondaryNiche", e.target.value)} placeholder="e.g. Travel" className="mt-1" />
+              </div>
+              <div>
+                <Label>Content Frequency</Label>
+                <Select value={form.contentFrequency} onValueChange={(v) => setField("contentFrequency", v)}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select frequency" /></SelectTrigger>
+                  <SelectContent>
+                    {FREQUENCY_OPTS.map((f) => <SelectItem key={f} value={f}>{fmt(f)}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Content Quality</Label>
+                <Select value={form.contentQuality} onValueChange={(v) => setField("contentQuality", v)}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select quality" /></SelectTrigger>
+                  <SelectContent>
+                    {QUALITY_OPTS.map((q) => <SelectItem key={q} value={q} className="capitalize">{q}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Video Style</Label>
+                <Input value={form.videoStyle} onChange={(e) => setField("videoStyle", e.target.value)} placeholder="e.g. Vlog, Tutorial" className="mt-1" />
+              </div>
+              <div>
+                <Label>Personality</Label>
+                <Input value={form.personality} onChange={(e) => setField("personality", e.target.value)} placeholder="e.g. Funny, Relatable" className="mt-1" />
+              </div>
+              <div>
+                <Label>Responsiveness</Label>
+                <Select value={form.responsiveness} onValueChange={(v) => setField("responsiveness", v)}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent>
+                    {RESPONSIVENESS_OPTS.map((r) => <SelectItem key={r} value={r}>{fmt(r)}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Availability</Label>
+                <Input value={form.availability} onChange={(e) => setField("availability", e.target.value)} placeholder="e.g. Weekdays only" className="mt-1" />
+              </div>
+              <div className="col-span-2">
+                <Label>Lifestyle Traits</Label>
+                <Textarea value={form.lifestyleTraits} onChange={(e) => setField("lifestyleTraits", e.target.value)} placeholder="e.g. Vegan, Traveler, Gym-goer" className="mt-1 resize-none" rows={2} />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="costs" className="px-6 py-4 grid grid-cols-2 gap-4 mt-0">
+              <div>
+                <Label>Brand Cost (रू)</Label>
+                <Input type="number" value={form.brandCost} onChange={(e) => setField("brandCost", e.target.value)} placeholder="0" className="mt-1" />
+              </div>
+              <div>
+                <Label>Net Cost (रू)</Label>
+                <Input type="number" value={form.netCost} onChange={(e) => setField("netCost", e.target.value)} placeholder="0" className="mt-1" />
+              </div>
+              <div>
+                <Label>Gross Cost (रू)</Label>
+                <Input type="number" value={form.grossCost} onChange={(e) => setField("grossCost", e.target.value)} placeholder="0" className="mt-1" />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="socials" className="px-6 py-4 space-y-3 mt-0">
+              {socials.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-8">No social accounts added yet.</p>
+              )}
+              {socials.map((s, i) => (
+                <div key={i} className="grid grid-cols-2 gap-3 p-3 rounded-lg border">
+                  <div className="col-span-2 flex items-center justify-between">
+                    <Select value={s.platform} onValueChange={(v) => updateSocial(i, "platform", v as SocialDraft["platform"])}>
+                      <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {PLATFORM_OPTS.map((p) => <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Button variant="ghost" size="icon-sm" onClick={() => setSocials((s) => s.filter((_, idx) => idx !== i))}>
+                      <X className="size-4" />
+                    </Button>
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-xs">Profile URL</Label>
+                    <Input value={s.profileUrl} onChange={(e) => updateSocial(i, "profileUrl", e.target.value)} placeholder="https://…" className="mt-1 h-8 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Followers</Label>
+                    <Input type="number" value={s.followers} onChange={(e) => updateSocial(i, "followers", e.target.value)} placeholder="0" className="mt-1 h-8 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Avg Views</Label>
+                    <Input type="number" value={s.avgViews} onChange={(e) => updateSocial(i, "avgViews", e.target.value)} placeholder="0" className="mt-1 h-8 text-sm" />
+                  </div>
+                </div>
+              ))}
+              <Button variant="outline" size="sm" onClick={() => setSocials((s) => [...s, { ...EMPTY_SOCIAL }])} className="w-full gap-1.5">
+                <Plus className="size-4" /> Add social account
+              </Button>
+            </TabsContent>
+          </ScrollArea>
+        </Tabs>
+
+        <div className="px-6 py-4 border-t flex justify-end gap-2 shrink-0">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            onClick={() => mutation.mutate()}
+            disabled={!form.name || !form.primaryLocation || mutation.isPending}
+          >
+            {mutation.isPending ? "Creating…" : "Create Influencer"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 function InfluencersPage() {
+  const { canEdit } = useAuth();
+  const queryClient = useQueryClient();
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [committed, setCommitted] = useState<FilterState>(EMPTY_FILTERS);
   const [page, setPage] = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [selected, setSelected] = useState<Influencer | null>(null);
   const [selectedMap, setSelectedMap] = useState<Map<string, Influencer>>(new Map());
   const [exportOpen, setExportOpen] = useState(false);
@@ -663,6 +987,12 @@ function InfluencersPage() {
               </span>
             ) : null}
           </Button>
+          {canEdit && (
+            <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5">
+              <Plus className="size-4" />
+              Add Influencer
+            </Button>
+          )}
         </div>
       </div>
 
@@ -997,6 +1327,13 @@ function InfluencersPage() {
           }}
         />
       )}
+
+      {/* Create influencer dialog */}
+      <CreateInfluencerDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={() => queryClient.invalidateQueries({ queryKey: ["influencers"] })}
+      />
 
       {/* Detail modal */}
       {selected && (
